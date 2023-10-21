@@ -44,29 +44,12 @@ class BasicAgent(Agent):
     
     def adjust_reward(self, old_reward, state, terminal=False):
         reward = old_reward
-        # vx penalty
-        # if (state[2] < 0.01) and (state[2] > -0.01):
-        #     reward += 5
-        # else:
-        #     reward -= abs(state[2])*0.1
-        # vy penalty
-        # if (state[3] >= -0.3) and (state[3] < -0.1):
-        #     reward += 5
-        # elif (state[3] >= -0.6) and (state[3] < -0.1):
-        #     reward += 1
-        # else:
-        #     reward -= abs(state[3])*0.1
-        # angle penalty
-        # if (state[4] < 0.01) and (state[4] > -0.01) and (abs(state[5]) == 0):
-        #     reward += 5
-        # else:
-        #     reward -= abs(state[4]) + abs(state[5])
         # Safe landing reward
         if (state[6] and state[7]) and ((state[3] >= -0.2) and (state[3] < 0.05)) and terminal:
             if self.print_mode:
                 print(f"Safe: vy={state[3]}, l1={state[6]}, l2={state[7]}")
                 print(f"x={state[0]}")
-            reward += 10000
+            reward += 5000
             if (state[0] >= -0.2) and (state[0] <= 0.2):
                 if self.print_mode:
                     print(f"Landed in goal as well")
@@ -74,22 +57,21 @@ class BasicAgent(Agent):
         elif (state[6] or state[7]) and ((state[3] >= -0.2) and (state[3] < 0.05)) and terminal:
             if self.print_mode:
                 print(f"ls_1l: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward += 300
+            reward -= 10
         # Both leg but high speed
         elif (state[6] and state[7]) and ((state[3] >= -0.6) and (state[3] < 0.05)) and terminal:
             if self.print_mode:
                 print(f"hs_bl: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward += 300
+            reward -= 10
         # one leg and high speed
         elif (state[6] or state[7]) and ((state[3] >= -0.6) and (state[3] < 0.05)) and terminal:
             if self.print_mode:
                 print(f"hs_1l: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward += 100
+            reward -= 30
         elif terminal:
             if self.print_mode:
                 print(f"Crash: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward -= 10000
-
+            reward -= 5000
         return reward
 
 
@@ -102,13 +84,11 @@ class BasicAgent(Agent):
         if s not in self.experience:
             self.experience[s] = np.random.randn(4)
         action = np.argmax(self.softmax(self.experience[s]))
-        # print(self.experience[s])
         return action
 
     def update(self, reward):
         ls = self.get_obs(self.last_state)
         self.experience[ls][self.last_action] += reward*self.step_size
-        # self.action_weights[self.last_action] += reward*0.01
 
     def start_step(self):
         action = 0
@@ -118,7 +98,6 @@ class BasicAgent(Agent):
         return action
 
     def step(self, state, reward):
-        # print(len(self.experience))
         reward = self.adjust_reward(reward, state)
         action = self.policy(state)
         self.update(reward)
