@@ -1,6 +1,6 @@
 from src.agent import Agent
 import numpy as np
-
+import src.lander_states as ls
 
 class BasicAgent(Agent):
     def __init__(self, print_mode=False):
@@ -20,11 +20,11 @@ class BasicAgent(Agent):
             self.print_mode = True
 
     def get_obs(self, state):
-        return (round(state[2], 1), round(state[3], 1), round(state[4], 1), round(state[5], 1))
+        return (round(state[ls.vx_id], 1), round(state[ls.vy_id], 1), round(state[ls.angle_id], 1), round(state[ls.ang_vel_id], 1))
 
-    def add_state_to_history(self, state, action):
-        obs_s = self.get_obs(state)
-        self.history.append((obs_s, action))
+    def add_state_action_to_history(self, state, action):
+        obs = self.get_obs(state)
+        self.history.append((obs, action))
 
     def history_update(self, reward):
         for state_action in self.history:
@@ -34,40 +34,40 @@ class BasicAgent(Agent):
 
     def discount_history_update(self, reward):
         total_steps = len(self.history)
-        t = 0
+        t = -1
         for state_action in self.history:
             t += 1
-            disc_fac = self.discount**(total_steps - t - 1)
+            retro_t = total_steps - t - 1
+            disc_fac = self.discount**(retro_t)
             state = state_action[0]
             action = state_action[1]
-            self.experience[state][action] += reward*self.step_size
-    
-    def adjust_reward(self, old_reward, state, terminal=False):
+            self.experience[state][action] += reward*self.step_size*disc_fac
+
+    def reward_update(self, old_reward, state):
         reward = old_reward
-        # Safe landing reward
-        if (state[6] and state[7]) and ((state[3] >= -0.2) and (state[3] < 0.05)) and terminal:
+        return reward
+    
+    def terminal_reward_update(self, old_reward, state, terminal=True):
+        reward = old_reward
+        if ls.safe_landing(state, terminal=terminal):
             if self.print_mode:
                 print(f"Safe: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-                print(f"x={state[0]}")
             reward += 5000
-            if (state[0] >= -0.2) and (state[0] <= 0.2):
+            if ls.lander_in_goal(state):
                 if self.print_mode:
                     print(f"Landed in goal as well")
-        # low speed but one leg
-        elif (state[6] or state[7]) and ((state[3] >= -0.2) and (state[3] < 0.05)) and terminal:
+        elif ls.safe_speed_one_leg_landing(state, terminal=terminal):
             if self.print_mode:
                 print(f"ls_1l: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward -= 10
-        # Both leg but high speed
-        elif (state[6] and state[7]) and ((state[3] >= -0.6) and (state[3] < 0.05)) and terminal:
+            reward += 30
+        elif ls.risky_speed_both_legs_landing(state, terminal=terminal):
             if self.print_mode:
                 print(f"hs_bl: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward -= 10
-        # one leg and high speed
-        elif (state[6] or state[7]) and ((state[3] >= -0.6) and (state[3] < 0.05)) and terminal:
+            reward += 30
+        elif ls.risky_speed_one_leg_landing(state, terminal=terminal):
             if self.print_mode:
                 print(f"hs_1l: vy={state[3]}, l1={state[6]}, l2={state[7]}")
-            reward -= 30
+            reward += 10
         elif terminal:
             if self.print_mode:
                 print(f"Crash: vy={state[3]}, l1={state[6]}, l2={state[7]}")
@@ -98,15 +98,15 @@ class BasicAgent(Agent):
         return action
 
     def step(self, state, reward):
-        reward = self.adjust_reward(reward, state)
+        reward = self.reward_update(reward, state)
         action = self.policy(state)
         self.update(reward)
-        self.add_state_to_history(state, action)
+        self.add_state_action_to_history(state, action)
         self.last_action = action
         self.last_state = state
         return action, reward
 
     def terminal_step(self, state, reward):
-        reward = self.adjust_reward(reward, state, terminal=True)
+        reward = self.terminal_reward_update(reward, state)
         self.discount_history_update(reward)
         return reward

@@ -6,13 +6,10 @@ class Agent():
         pass
 
     def start_step(self):
-        action = 0
-        return action
+        pass
 
     def step(self):
-        action = 0
-        return action
+        pass
 
     def terminal_step(self):
-        action = 0
-        return action
+        pass
